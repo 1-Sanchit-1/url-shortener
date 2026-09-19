@@ -14,6 +14,18 @@ services:
       redis:
         condition: service_healthy
 
+  # Consumes the click stream and writes batches to PostgreSQL. Scale with
+  # `docker compose up --scale worker=3`; the consumer group splits the stream.
+  worker:
+    build: .
+    environment: *app-env
+    command: ["python", "-m", "app.workers.click_consumer"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
   # One-shot job: apply migrations before the API starts accepting traffic.
   migrate:
     build: .

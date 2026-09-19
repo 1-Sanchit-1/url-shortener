@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from redis.asyncio import BlockingConnectionPool, Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
+from app.analytics.events import ClickPublisher
 from app.cache.invalidation import InvalidationBus
 from app.cache.local import LocalCache
 from app.cache.redis_cache import CacheEntry, LinkCache
@@ -28,6 +29,7 @@ class Container:
     resolver: LinkResolver
     invalidation_bus: InvalidationBus
     rate_limiter: TokenBucketLimiter
+    click_publisher: ClickPublisher
 
     @classmethod
     async def create(cls, settings: Settings) -> "Container":
@@ -61,6 +63,7 @@ class Container:
             resolver=resolver,
             invalidation_bus=bus,
             rate_limiter=TokenBucketLimiter(redis),
+            click_publisher=ClickPublisher(redis, settings),
         )
 
     async def aclose(self) -> None:

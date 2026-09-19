@@ -1,7 +1,8 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import RedirectResponse
+from starlette.background import BackgroundTask
 
-from app.api.deps import ResolverDep
+from app.api.deps import ContainerDep, ResolverDep
 from app.api.ratelimit import limit_by_ip
 from app.core.errors import GoneError, NotFoundError
 
@@ -15,7 +16,9 @@ MAX_CODE_LENGTH = 32
     response_class=RedirectResponse,
     dependencies=[Depends(limit_by_ip("redirect"))],
 )
-async def follow(short_code: str, resolver: ResolverDep) -> RedirectResponse:
+async def follow(
+    short_code: str, request: Request, resolver: ResolverDep, container: ContainerDep
+) -> RedirectResponse:
     """Redirect to the target URL.
 
     302 rather than 301: browsers cache 301s indefinitely, so later clicks would never
@@ -29,4 +32,12 @@ async def follow(short_code: str, resolver: ResolverDep) -> RedirectResponse:
         raise NotFoundError("short link not found")
     if link.is_expired():
         raise GoneError("short link has expired")
-    return RedirectResponse(link.target_url, status_code=status.HTTP_302_FOUND)
+
+    publisher = container.click_publisher
+    event = publisher.build_event(link.url_id, request)
+    # Runs after the response is sent, so it adds nothing to redirect latency.
+    return RedirectResponse(
+        link.target_url,
+        status_code=status.HTTP_302_FOUND,
+        background=BackgroundTask(publisher.publish, event),
+    )

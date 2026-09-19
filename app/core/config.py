@@ -45,6 +45,17 @@ class Settings(BaseSettings):
     l1_cache_ttl_seconds: float = 5.0
     l1_stale_grace_seconds: float = 300.0
 
+    # Click analytics pipeline
+    click_stream_name: str = "clicks"
+    # Bounds Redis memory if consumers fall behind. Size it to hold several hours
+    # of peak traffic, and alert on consumer lag well before it is reached.
+    click_stream_maxlen: int = 1_000_000
+    click_consumer_group: str = "click-ingest"
+    click_batch_size: int = 500
+    click_block_ms: int = 1000
+    click_claim_idle_ms: int = 30_000
+    analytics_salt: SecretStr = SecretStr("dev-only-analytics-salt")
+
     # Short codes
     short_code_length: int = 7
     short_code_max_attempts: int = 5
@@ -75,6 +86,8 @@ class Settings(BaseSettings):
         secret = self.jwt_secret.get_secret_value()
         if self.environment == "prod" and (secret == DEV_JWT_SECRET or len(secret) < 32):
             raise ValueError("APP_JWT_SECRET must be set to a random value of 32+ characters")
+        if self.environment == "prod" and self.analytics_salt.get_secret_value().startswith("dev-"):
+            raise ValueError("APP_ANALYTICS_SALT must be set in production")
         return self
 
 
