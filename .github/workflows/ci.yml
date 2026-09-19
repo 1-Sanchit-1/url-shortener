@@ -33,7 +33,7 @@ jobs:
       - name: Ruff format
         run: uv run ruff format --check .
       - name: Mypy (strict)
-        run: uv run mypy app tests
+        run: uv run mypy app tests scripts
 
   test:
     name: Tests

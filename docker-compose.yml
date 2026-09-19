@@ -57,6 +57,9 @@ services:
 
   postgres:
     image: postgres:16-alpine
+    # Docker's default 64 MB /dev/shm is too small for parallel query and parallel
+    # VACUUM on multi-million-row tables ("could not resize shared memory segment").
+    shm_size: 512mb
     environment:
       POSTGRES_USER: shortener
       POSTGRES_PASSWORD: shortener

@@ -1,0 +1,19 @@
+# Benchmark overrides: docker compose -f docker-compose.yml -f docker-compose.bench.yml ...
+# Used by scripts/bench.sh; see docs/BENCHMARKS.md.
+services:
+  api:
+    environment:
+      # All load comes from one client IP; per-IP limits would reject most of it.
+      # The limiter's own overhead is covered separately (see BENCHMARKS.md).
+      APP_RATE_LIMIT_ENABLED: "false"
+    deploy:
+      replicas: ${API_REPLICAS:-2}
+
+  locust:
+    image: locustio/locust:2.32.4
+    profiles: ["bench"]
+    volumes:
+      - .:/mnt
+    working_dir: /mnt
+    depends_on:
+      - nginx

@@ -31,6 +31,10 @@ dev = [
     "mypy>=1.11",
 ]
 
+loadtest = [
+    "locust>=2.32",
+]
+
 [tool.uv]
 package = false
 
@@ -45,6 +49,8 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101", "S105", "S106", "S603"]
+"scripts/**" = ["T201"]
+"loadtest/**" = ["T201"]
 
 [tool.mypy]
 python_version = "3.12"

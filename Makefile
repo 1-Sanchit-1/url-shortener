@@ -1,4 +1,4 @@
-.PHONY: help install up down logs db migrate worker lint format typecheck test check
+.PHONY: help install up down logs db migrate worker seed bench explain lint format typecheck test check
 
 help:  ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
@@ -24,6 +24,15 @@ migrate:  ## Apply database migrations
 worker:  ## Run the click-stream consumer locally
 	uv run python -m app.workers.click_consumer
 
+seed:  ## Seed 100k links and 5M clicks for load testing (destructive: --reset)
+	uv run python -m scripts.seed --reset
+
+bench:  ## Run the load test (see docs/BENCHMARKS.md), e.g. make bench LABEL=baseline
+	scripts/bench.sh $(or $(LABEL),run)
+
+explain:  ## Print EXPLAIN ANALYZE plans for the hot-path queries
+	uv run python -m scripts.explain
+
 lint:  ## Lint and check formatting
 	uv run ruff check .
 	uv run ruff format --check .
@@ -33,7 +42,7 @@ format:  ## Auto-format and fix lint issues
 	uv run ruff check --fix .
 
 typecheck:  ## Run mypy in strict mode
-	uv run mypy app tests
+	uv run mypy app tests scripts
 
 test:  ## Run the test suite
 	uv run pytest
