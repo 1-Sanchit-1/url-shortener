@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
@@ -5,9 +6,10 @@ from httpx import AsyncClient
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analytics.ingest import ClickRow, persist_clicks
 from app.core.config import Settings
 from app.core.container import Container
-from app.models import ClickEvent
+from app.models import ClickEvent, ClickRollupHourly
 from app.workers.click_consumer import ClickConsumer, parse_entry
 
 Headers = dict[str, str]
@@ -117,3 +119,29 @@ async def test_malformed_entries_are_dropped_not_retried(
         settings.click_stream_name, settings.click_consumer_group
     )
     assert pending["pending"] == 0
+
+
+async def test_rollups_accumulate_across_batches(session: AsyncSession) -> None:
+    hour = datetime(2026, 5, 1, 10, tzinfo=UTC)
+
+    def row(event_id: str, minute: int) -> ClickRow:
+        return ClickRow(
+            event_id=event_id,
+            url_id=7,
+            occurred_at=hour + timedelta(minutes=minute),
+            referrer_host=None,
+            user_agent=None,
+            visitor_hash=None,
+        )
+
+    await persist_clicks(session, [row("1-0", 1), row("2-0", 59)])
+    await persist_clicks(session, [row("3-0", 30), row("4-0", 61)])
+
+    buckets = (
+        await session.execute(
+            select(ClickRollupHourly.bucket_start, ClickRollupHourly.clicks).order_by(
+                ClickRollupHourly.bucket_start
+            )
+        )
+    ).all()
+    assert [tuple(b) for b in buckets] == [(hour, 3), (hour + timedelta(hours=1), 1)]

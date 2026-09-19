@@ -1,11 +1,10 @@
 from datetime import UTC, datetime, timedelta
 
 from httpx import AsyncClient
-from sqlalchemy import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.analytics.ingest import ClickRow, persist_clicks
 from app.core.container import Container
-from app.models import ClickEvent
 from app.workers.click_consumer import ClickConsumer
 from tests.utils import register_and_login
 
@@ -27,17 +26,17 @@ async def _clicks(
     session: AsyncSession, url_id: int, events: list[tuple[datetime, str | None, str]]
 ) -> None:
     rows = [
-        {
-            "event_id": f"{i}-0",
-            "url_id": url_id,
-            "occurred_at": ts,
-            "referrer_host": ref,
-            "visitor_hash": visitor,
-        }
+        ClickRow(
+            event_id=f"{i}-0",
+            url_id=url_id,
+            occurred_at=ts,
+            referrer_host=ref,
+            user_agent=None,
+            visitor_hash=visitor,
+        )
         for i, (ts, ref, visitor) in enumerate(events)
     ]
-    await session.execute(insert(ClickEvent), rows)
-    await session.commit()
+    await persist_clicks(session, rows)
 
 
 async def test_daily_series_is_zero_filled(

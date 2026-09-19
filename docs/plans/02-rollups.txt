@@ -1,0 +1,84 @@
+-- hottest link: ld1 (id=1, 169,465 clicks)
+
+====================================================================================================
+SELECT urls.id, urls.short_code, urls.target_url, urls.owner_id, urls.is_custom, urls.is_active, urls.expires_at, urls.deleted_at, urls.created_at, urls.updated_at
+FROM urls
+WHERE urls.short_code = $1::VARCHAR AND urls.deleted_at IS NULL
+-- params: ('ld1',)
+
+Index Scan using uq_urls_short_code on urls  (cost=0.42..8.44 rows=1 width=91) (actual time=0.014..0.014 rows=1 loops=1)
+  Index Cond: ((short_code)::text = 'ld1'::text)
+  Filter: (deleted_at IS NULL)
+  Buffers: shared hit=4
+Planning Time: 0.041 ms
+Execution Time: 0.028 ms
+
+====================================================================================================
+SELECT date_trunc($1::VARCHAR, click_rollups_hourly.bucket_start, $2::VARCHAR) AS bucket, sum(click_rollups_hourly.clicks) AS sum_1
+FROM click_rollups_hourly
+WHERE click_rollups_hourly.url_id = $3::BIGINT AND click_rollups_hourly.bucket_start >= $4::TIMESTAMP WITH TIME ZONE AND click_rollups_hourly.bucket_start < $5::TIMESTAMP WITH TIME ZONE GROUP BY date_trunc($1::VARCHAR, click_rollups_hourly.bucket_start, $2::VARCHAR) ORDER BY bucket
+-- params: ('day', 'UTC', 1, datetime.datetime(2026, 9, 12, 0, 0, tzinfo=datetime.timezone.utc), datetime.datetime(2026, 9, 20, 0, 0, tzinfo=datetime.timezone.utc))
+
+GroupAggregate  (cost=415.59..417.62 rows=82 width=40) (actual time=0.187..0.198 rows=8 loops=1)
+  Group Key: (date_trunc('day'::text, bucket_start, 'UTC'::text))
+  Buffers: shared hit=156
+  ->  Sort  (cost=415.59..415.86 rows=106 width=16) (actual time=0.182..0.187 rows=175 loops=1)
+        Sort Key: (date_trunc('day'::text, bucket_start, 'UTC'::text))
+        Sort Method: quicksort  Memory: 31kB
+        Buffers: shared hit=156
+        ->  Bitmap Heap Scan on click_rollups_hourly  (cost=5.78..412.02 rows=106 width=16) (actual time=0.034..0.164 rows=175 loops=1)
+              Recheck Cond: ((url_id = '1'::bigint) AND (bucket_start >= '2026-09-12 00:00:00+00'::timestamp with time zone) AND (bucket_start < '2026-09-20 00:00:00+00'::timestamp with time zone))
+              Heap Blocks: exact=152
+              Buffers: shared hit=156
+              ->  Bitmap Index Scan on pk_click_rollups_hourly  (cost=0.00..5.76 rows=106 width=0) (actual time=0.021..0.021 rows=175 loops=1)
+                    Index Cond: ((url_id = '1'::bigint) AND (bucket_start >= '2026-09-12 00:00:00+00'::timestamp with time zone) AND (bucket_start < '2026-09-20 00:00:00+00'::timestamp with time zone))
+                    Buffers: shared hit=4
+Planning Time: 0.030 ms
+Execution Time: 0.272 ms
+
+====================================================================================================
+SELECT count(distinct(click_events.visitor_hash)) AS count_1
+FROM click_events
+WHERE click_events.url_id = $1::BIGINT AND click_events.occurred_at >= $2::TIMESTAMP WITH TIME ZONE AND click_events.occurred_at < $3::TIMESTAMP WITH TIME ZONE
+-- params: (1, datetime.datetime(2026, 9, 12, 0, 0, tzinfo=datetime.timezone.utc), datetime.datetime(2026, 9, 20, 0, 0, tzinfo=datetime.timezone.utc))
+
+Aggregate  (cost=8066.72..8066.73 rows=1 width=8) (actual time=28.398..28.398 rows=1 loops=1)
+  Buffers: shared hit=15832, temp read=227 written=228
+  ->  Sort  (cost=7778.90..7922.81 rows=57563 width=17) (actual time=21.250..25.113 rows=87804 loops=1)
+        Sort Key: visitor_hash
+        Sort Method: external merge  Disk: 1816kB
+        Buffers: shared hit=15832, temp read=227 written=228
+        ->  Index Only Scan using ix_click_events_url_id_occurred_at on click_events  (cost=0.56..3227.72 rows=57563 width=17) (actual time=0.010..6.057 rows=87804 loops=1)
+              Index Cond: ((url_id = '1'::bigint) AND (occurred_at >= '2026-09-12 00:00:00+00'::timestamp with time zone) AND (occurred_at < '2026-09-20 00:00:00+00'::timestamp with time zone))
+              Heap Fetches: 0
+              Buffers: shared hit=15832
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.028 ms
+Execution Time: 28.600 ms
+
+====================================================================================================
+SELECT coalesce(click_events.referrer_host, $1::VARCHAR) AS referrer, count(*) AS clicks
+FROM click_events
+WHERE click_events.url_id = $2::BIGINT AND click_events.occurred_at >= $3::TIMESTAMP WITH TIME ZONE AND click_events.occurred_at < $4::TIMESTAMP WITH TIME ZONE GROUP BY coalesce(click_events.referrer_host, $1::VARCHAR) ORDER BY count(*) DESC, referrer
+ LIMIT $5::INTEGER
+-- params: ('(direct)', 1, datetime.datetime(2026, 9, 12, 0, 0, tzinfo=datetime.timezone.utc), datetime.datetime(2026, 9, 20, 0, 0, tzinfo=datetime.timezone.utc), 10)
+
+Limit  (cost=3515.65..3515.66 rows=5 width=40) (actual time=12.539..12.540 rows=6 loops=1)
+  Buffers: shared hit=15832
+  ->  Sort  (cost=3515.65..3515.66 rows=5 width=40) (actual time=12.538..12.539 rows=6 loops=1)
+        Sort Key: (count(*)) DESC, (COALESCE(referrer_host, '(direct)'::character varying))
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=15832
+        ->  HashAggregate  (cost=3515.54..3515.59 rows=5 width=40) (actual time=12.532..12.532 rows=6 loops=1)
+              Group Key: COALESCE(referrer_host, '(direct)'::character varying)
+              Batches: 1  Memory Usage: 24kB
+              Buffers: shared hit=15832
+              ->  Index Only Scan using ix_click_events_url_id_occurred_at on click_events  (cost=0.56..3227.72 rows=57563 width=32) (actual time=0.008..6.990 rows=87804 loops=1)
+                    Index Cond: ((url_id = '1'::bigint) AND (occurred_at >= '2026-09-12 00:00:00+00'::timestamp with time zone) AND (occurred_at < '2026-09-20 00:00:00+00'::timestamp with time zone))
+                    Heap Fetches: 0
+                    Buffers: shared hit=15832
+Planning:
+  Buffers: shared hit=1
+Planning Time: 0.034 ms
+Execution Time: 12.562 ms

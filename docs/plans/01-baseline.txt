@@ -1,0 +1,137 @@
+-- hottest link: ld1 (id=1, 169,465 clicks)
+
+====================================================================================================
+SELECT urls.id, urls.short_code, urls.target_url, urls.owner_id, urls.is_custom, urls.is_active, urls.expires_at, urls.deleted_at, urls.created_at, urls.updated_at
+FROM urls
+WHERE urls.short_code = $1::VARCHAR AND urls.deleted_at IS NULL
+-- params: ('ld1',)
+
+Index Scan using uq_urls_short_code on urls  (cost=0.42..8.44 rows=1 width=91) (actual time=0.039..0.040 rows=1 loops=1)
+  Index Cond: ((short_code)::text = 'ld1'::text)
+  Filter: (deleted_at IS NULL)
+  Buffers: shared read=4
+Planning Time: 0.038 ms
+Execution Time: 0.063 ms
+
+====================================================================================================
+SELECT date_trunc($1::VARCHAR, click_events.occurred_at, $2::VARCHAR) AS bucket, count(*) AS count_1
+FROM click_events
+WHERE click_events.url_id = $3::BIGINT AND click_events.occurred_at >= $4::TIMESTAMP WITH TIME ZONE AND click_events.occurred_at < $5::TIMESTAMP WITH TIME ZONE GROUP BY date_trunc($1::VARCHAR, click_events.occurred_at, $2::VARCHAR) ORDER BY bucket
+-- params: ('day', 'UTC', 1, datetime.datetime(2026, 9, 12, 0, 0, tzinfo=datetime.timezone.utc), datetime.datetime(2026, 9, 20, 0, 0, tzinfo=datetime.timezone.utc))
+
+Finalize GroupAggregate  (cost=114537.12..121275.11 rows=55424 width=16) (actual time=119.877..123.974 rows=8 loops=1)
+  Group Key: (date_trunc('day'::text, occurred_at, 'UTC'::text))
+  Buffers: shared hit=12 read=67660
+  ->  Gather Merge  (cost=114537.12..120350.56 rows=46350 width=16) (actual time=119.783..123.962 rows=24 loops=1)
+        Workers Planned: 2
+        Workers Launched: 2
+        Buffers: shared hit=12 read=67660
+        ->  Partial GroupAggregate  (cost=113537.10..114000.60 rows=23175 width=16) (actual time=110.888..112.526 rows=8 loops=3)
+              Group Key: (date_trunc('day'::text, occurred_at, 'UTC'::text))
+              Buffers: shared hit=12 read=67660
+              ->  Sort  (cost=113537.10..113595.03 rows=23175 width=8) (actual time=110.804..111.498 rows=29268 loops=3)
+                    Sort Key: (date_trunc('day'::text, occurred_at, 'UTC'::text))
+                    Sort Method: quicksort  Memory: 769kB
+                    Buffers: shared hit=12 read=67660
+                    Worker 0:  Sort Method: quicksort  Memory: 769kB
+                    Worker 1:  Sort Method: quicksort  Memory: 769kB
+                    ->  Parallel Bitmap Heap Scan on click_events  (cost=1890.38..111856.88 rows=23175 width=8) (actual time=8.741..108.975 rows=29268 loops=3)
+                          Recheck Cond: (url_id = '1'::bigint)
+                          Rows Removed by Index Recheck: 736879
+                          Filter: ((occurred_at >= '2026-09-12 00:00:00+00'::timestamp with time zone) AND (occurred_at < '2026-09-20 00:00:00+00'::timestamp with time zone))
+                          Rows Removed by Filter: 27220
+                          Heap Blocks: exact=13201 lossy=12571
+                          Buffers: shared read=67656
+                          ->  Bitmap Index Scan on ix_click_events_url_id  (cost=0.00..1876.48 rows=169606 width=0) (actual time=9.258..9.259 rows=169465 loops=1)
+                                Index Cond: (url_id = '1'::bigint)
+                                Buffers: shared read=144
+Planning Time: 0.032 ms
+JIT:
+  Functions: 33
+  Options: Inlining false, Optimization false, Expressions true, Deforming true
+  Timing: Generation 1.247 ms, Inlining 0.000 ms, Optimization 0.429 ms, Emission 9.952 ms, Total 11.628 ms
+Execution Time: 124.417 ms
+
+====================================================================================================
+SELECT count(distinct(click_events.visitor_hash)) AS count_1
+FROM click_events
+WHERE click_events.url_id = $1::BIGINT AND click_events.occurred_at >= $2::TIMESTAMP WITH TIME ZONE AND click_events.occurred_at < $3::TIMESTAMP WITH TIME ZONE
+-- params: (1, datetime.datetime(2026, 9, 12, 0, 0, tzinfo=datetime.timezone.utc), datetime.datetime(2026, 9, 20, 0, 0, tzinfo=datetime.timezone.utc))
+
+Aggregate  (cost=121096.22..121096.23 rows=1 width=8) (actual time=117.014..120.292 rows=1 loops=1)
+  Buffers: shared hit=13 read=67659
+  ->  Gather Merge  (cost=114479.18..120957.16 rows=55621 width=17) (actual time=104.254..116.443 rows=87804 loops=1)
+        Workers Planned: 2
+        Workers Launched: 2
+        Buffers: shared hit=13 read=67659
+        ->  Sort  (cost=113479.16..113537.10 rows=23175 width=17) (actual time=96.674..97.389 rows=29268 loops=3)
+              Sort Key: visitor_hash
+              Sort Method: quicksort  Memory: 1732kB
+              Buffers: shared hit=13 read=67659
+              Worker 0:  Sort Method: quicksort  Memory: 1661kB
+              Worker 1:  Sort Method: quicksort  Memory: 1656kB
+              ->  Parallel Bitmap Heap Scan on click_events  (cost=1890.38..111798.94 rows=23175 width=17) (actual time=8.024..91.663 rows=29268 loops=3)
+                    Recheck Cond: (url_id = '1'::bigint)
+                    Rows Removed by Index Recheck: 736879
+                    Filter: ((occurred_at >= '2026-09-12 00:00:00+00'::timestamp with time zone) AND (occurred_at < '2026-09-20 00:00:00+00'::timestamp with time zone))
+                    Rows Removed by Filter: 27220
+                    Heap Blocks: exact=12706 lossy=12159
+                    Buffers: shared read=67656
+                    ->  Bitmap Index Scan on ix_click_events_url_id  (cost=0.00..1876.48 rows=169606 width=0) (actual time=9.302..9.302 rows=169465 loops=1)
+                          Index Cond: (url_id = '1'::bigint)
+                          Buffers: shared read=144
+Planning Time: 0.065 ms
+JIT:
+  Functions: 20
+  Options: Inlining false, Optimization false, Expressions true, Deforming true
+  Timing: Generation 0.889 ms, Inlining 0.000 ms, Optimization 0.378 ms, Emission 7.683 ms, Total 8.949 ms
+Execution Time: 120.732 ms
+
+====================================================================================================
+SELECT coalesce(click_events.referrer_host, $1::VARCHAR) AS referrer, count(*) AS clicks
+FROM click_events
+WHERE click_events.url_id = $2::BIGINT AND click_events.occurred_at >= $3::TIMESTAMP WITH TIME ZONE AND click_events.occurred_at < $4::TIMESTAMP WITH TIME ZONE GROUP BY coalesce(click_events.referrer_host, $1::VARCHAR) ORDER BY count(*) DESC, referrer
+ LIMIT $5::INTEGER
+-- params: ('(direct)', 1, datetime.datetime(2026, 9, 12, 0, 0, tzinfo=datetime.timezone.utc), datetime.datetime(2026, 9, 20, 0, 0, tzinfo=datetime.timezone.utc), 10)
+
+Limit  (cost=112916.27..112916.28 rows=5 width=40) (actual time=103.617..107.580 rows=6 loops=1)
+  Buffers: shared hit=15 read=67657
+  ->  Sort  (cost=112916.27..112916.28 rows=5 width=40) (actual time=100.057..104.020 rows=6 loops=1)
+        Sort Key: (count(*)) DESC, (COALESCE(referrer_host, '(direct)'::character varying))
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=15 read=67657
+        ->  Finalize GroupAggregate  (cost=112914.95..112916.21 rows=5 width=40) (actual time=100.048..104.014 rows=6 loops=1)
+              Group Key: (COALESCE(referrer_host, '(direct)'::character varying))
+              Buffers: shared hit=15 read=67657
+              ->  Gather Merge  (cost=112914.95..112916.11 rows=10 width=40) (actual time=100.029..103.994 rows=18 loops=1)
+                    Workers Planned: 2
+                    Workers Launched: 2
+                    Buffers: shared hit=15 read=67657
+                    ->  Sort  (cost=111914.92..111914.93 rows=5 width=40) (actual time=92.485..92.486 rows=6 loops=3)
+                          Sort Key: (COALESCE(referrer_host, '(direct)'::character varying))
+                          Sort Method: quicksort  Memory: 25kB
+                          Buffers: shared hit=15 read=67657
+                          Worker 0:  Sort Method: quicksort  Memory: 25kB
+                          Worker 1:  Sort Method: quicksort  Memory: 25kB
+                          ->  Partial HashAggregate  (cost=111914.81..111914.86 rows=5 width=40) (actual time=92.462..92.463 rows=6 loops=3)
+                                Group Key: COALESCE(referrer_host, '(direct)'::character varying)
+                                Batches: 1  Memory Usage: 24kB
+                                Buffers: shared read=67656
+                                Worker 0:  Batches: 1  Memory Usage: 24kB
+                                Worker 1:  Batches: 1  Memory Usage: 24kB
+                                ->  Parallel Bitmap Heap Scan on click_events  (cost=1890.38..111798.94 rows=23175 width=32) (actual time=7.578..89.506 rows=29268 loops=3)
+                                      Recheck Cond: (url_id = '1'::bigint)
+                                      Rows Removed by Index Recheck: 736879
+                                      Filter: ((occurred_at >= '2026-09-12 00:00:00+00'::timestamp with time zone) AND (occurred_at < '2026-09-20 00:00:00+00'::timestamp with time zone))
+                                      Rows Removed by Filter: 27220
+                                      Heap Blocks: exact=13467 lossy=12833
+                                      Buffers: shared read=67656
+                                      ->  Bitmap Index Scan on ix_click_events_url_id  (cost=0.00..1876.48 rows=169606 width=0) (actual time=9.415..9.415 rows=169465 loops=1)
+                                            Index Cond: (url_id = '1'::bigint)
+                                            Buffers: shared read=144
+Planning Time: 0.063 ms
+JIT:
+  Functions: 34
+  Options: Inlining false, Optimization false, Expressions true, Deforming true
+  Timing: Generation 1.195 ms, Inlining 0.000 ms, Optimization 0.408 ms, Emission 10.410 ms, Total 12.013 ms
+Execution Time: 108.013 ms

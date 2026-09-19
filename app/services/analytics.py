@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import InvalidRequestError
-from app.models import ClickEvent
+from app.models import ClickEvent, ClickRollupHourly
 from app.schemas.analytics import AnalyticsResponse, Granularity, ReferrerCount, SeriesPoint
 
 STEP = {Granularity.HOUR: timedelta(hours=1), Granularity.DAY: timedelta(days=1)}
@@ -44,17 +44,29 @@ class AnalyticsService:
                 f"(max {MAX_RANGE[granularity].days} days)"
             )
 
+        # Time series from the hourly rollups: at most 24 rows per day of range,
+        # however popular the link is.
+        rollup = ClickRollupHourly
+        bucket = func.date_trunc(granularity.value, rollup.bucket_start, "UTC").label("bucket")
+        series_rows = await self._session.execute(
+            select(bucket, func.sum(rollup.clicks))
+            .where(
+                rollup.url_id == url_id,
+                rollup.bucket_start >= start,
+                rollup.bucket_start < end,
+            )
+            .group_by(bucket)
+            .order_by(bucket)
+        )
+        counts = {row[0]: int(row[1]) for row in series_rows}
+
+        # Distinct visitors and referrers need raw events; both queries are
+        # index-only scans on ix_click_events_url_id_occurred_at.
         in_range = (
             ClickEvent.url_id == url_id,
             ClickEvent.occurred_at >= start,
             ClickEvent.occurred_at < end,
         )
-        bucket = func.date_trunc(granularity.value, ClickEvent.occurred_at, "UTC").label("bucket")
-        series_rows = await self._session.execute(
-            select(bucket, func.count()).where(*in_range).group_by(bucket).order_by(bucket)
-        )
-        counts = {row[0]: row[1] for row in series_rows}
-
         unique_visitors = await self._session.scalar(
             select(func.count(func.distinct(ClickEvent.visitor_hash))).where(*in_range)
         )

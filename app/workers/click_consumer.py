@@ -22,14 +22,13 @@ from typing import Any
 from prometheus_client import start_http_server
 from redis.asyncio import Redis
 from redis.exceptions import ResponseError
-from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from app.analytics.ingest import ClickRow, persist_clicks
 from app.cache.redis_cache import REDIS_ERRORS
 from app.core.config import Settings, get_settings
 from app.core.logging import configure_logging
 from app.db.session import create_engine, create_sessionmaker
-from app.models import ClickEvent
 from app.observability.metrics import (
     CLICK_BATCH_DURATION,
     CLICK_EVENTS_INGESTED,
@@ -37,8 +36,6 @@ from app.observability.metrics import (
 )
 
 logger = logging.getLogger(__name__)
-
-Row = dict[str, Any]
 
 
 class ClickConsumer:
@@ -82,7 +79,8 @@ class ClickConsumer:
         if not entries:
             return 0
 
-        rows, ids = [], []
+        rows: list[ClickRow] = []
+        ids = []
         for entry_id, fields in entries:
             ids.append(entry_id)
             row = parse_entry(entry_id, fields)
@@ -122,11 +120,9 @@ class ClickConsumer:
                 await asyncio.sleep(1)
         logger.info("click consumer stopped", extra={"consumer": self._consumer})
 
-    async def _persist(self, rows: list[Row]) -> None:
+    async def _persist(self, rows: list[ClickRow]) -> None:
         async with self._sessionmaker() as session:
-            stmt = insert(ClickEvent).values(rows)
-            await session.execute(stmt.on_conflict_do_nothing(index_elements=["event_id"]))
-            await session.commit()
+            await persist_clicks(session, rows)
 
     async def _reclaim_stale(self) -> list[tuple[Any, Any]]:
         """Take over entries a crashed consumer read but never acknowledged."""
@@ -145,7 +141,7 @@ class ClickConsumer:
         return list(claimed[1])
 
 
-def parse_entry(entry_id: bytes | str, fields: dict[bytes, bytes]) -> Row | None:
+def parse_entry(entry_id: bytes | str, fields: dict[bytes, bytes]) -> ClickRow | None:
     try:
         data = {k.decode(): v.decode() for k, v in fields.items()}
         return {
