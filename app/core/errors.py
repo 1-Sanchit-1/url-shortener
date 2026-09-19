@@ -10,6 +10,8 @@ class AppError(Exception):
     status_code = 500
     code = "internal_error"
 
+    headers: dict[str, str] | None = None
+
     def __init__(self, message: str = "") -> None:
         super().__init__(message)
         self.message = message or self.code.replace("_", " ")
@@ -18,6 +20,17 @@ class AppError(Exception):
 class InvalidRequestError(AppError):
     status_code = 422
     code = "invalid_request"
+
+
+class UnauthorizedError(AppError):
+    status_code = 401
+    code = "unauthorized"
+    headers = {"WWW-Authenticate": "Bearer"}  # noqa: RUF012
+
+
+class ForbiddenError(AppError):
+    status_code = 403
+    code = "forbidden"
 
 
 class NotFoundError(AppError):
@@ -45,6 +58,7 @@ async def _handle_app_error(_: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status_code,
         content={"error": {"code": exc.code, "message": exc.message}},
+        headers=exc.headers,
     )
 
 

@@ -16,6 +16,7 @@ from app.core.config import Settings
 from app.core.container import Container
 from app.db.base import Base
 from app.main import create_app
+from tests.utils import login, register_and_login
 
 TEST_DATABASE_URL = os.environ.get(
     "APP_DATABASE_URL",
@@ -79,3 +80,17 @@ async def client(app: FastAPI) -> AsyncIterator[AsyncClient]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as http:
         yield http
+
+
+@pytest.fixture
+async def user_headers(client: AsyncClient) -> dict[str, str]:
+    return await register_and_login(client, "alice@example.com")
+
+
+@pytest.fixture
+async def admin_headers(client: AsyncClient, session: AsyncSession) -> dict[str, str]:
+    await register_and_login(client, "root@example.com")
+    await session.execute(text("UPDATE users SET role = 'admin' WHERE email = 'root@example.com'"))
+    await session.commit()
+    # Log in again: the role is embedded in the access token at issue time.
+    return await login(client, "root@example.com")

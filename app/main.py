@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from app.api.routes import health, redirect, urls
+from app.api.routes import admin, auth, health, redirect, urls
 from app.core.config import Settings, get_settings
 from app.core.container import Container
 from app.core.errors import register_error_handlers
@@ -25,7 +25,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(title="URL Shortener", version="0.1.0", lifespan=lifespan)
     register_error_handlers(app)
     app.include_router(health.router)
+    app.include_router(auth.router)
     app.include_router(urls.router)
+    app.include_router(admin.router)
     # The catch-all redirect route must be registered last so it never shadows other paths.
     app.include_router(redirect.router)
     return app

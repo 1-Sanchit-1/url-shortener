@@ -24,3 +24,5 @@ make down
 ```
 
 Run `make help` to list the development targets.
+
+Create an admin account with `uv run python -m app.cli create-admin you@example.com`.

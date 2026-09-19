@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime
 
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +29,7 @@ async def try_insert(
     target_url: str,
     is_custom: bool,
     expires_at: datetime | None,
+    owner_id: int | None,
 ) -> Url | None:
     """Insert a URL, returning ``None`` instead of raising if the short code exists.
 
@@ -42,6 +44,7 @@ async def try_insert(
             target_url=target_url,
             is_custom=is_custom,
             expires_at=expires_at,
+            owner_id=owner_id,
         )
         .on_conflict_do_nothing(index_elements=[Url.short_code])
         .returning(Url)
@@ -57,6 +60,7 @@ async def insert_with_generated_code(
     expires_at: datetime | None,
     length: int,
     max_attempts: int,
+    owner_id: int | None = None,
     generate: CodeGenerator = random_code,
 ) -> Url:
     for attempt in range(max_attempts):
@@ -69,6 +73,7 @@ async def insert_with_generated_code(
             target_url=target_url,
             is_custom=False,
             expires_at=expires_at,
+            owner_id=owner_id,
         )
         if url is not None:
             return url
@@ -77,11 +82,45 @@ async def insert_with_generated_code(
 
 
 async def insert_with_alias(
-    session: AsyncSession, *, alias: str, target_url: str, expires_at: datetime | None
+    session: AsyncSession,
+    *,
+    alias: str,
+    target_url: str,
+    expires_at: datetime | None,
+    owner_id: int | None = None,
 ) -> Url:
     url = await try_insert(
-        session, short_code=alias, target_url=target_url, is_custom=True, expires_at=expires_at
+        session,
+        short_code=alias,
+        target_url=target_url,
+        is_custom=True,
+        expires_at=expires_at,
+        owner_id=owner_id,
     )
     if url is None:
         raise AliasTakenError(f"alias '{alias}' is already in use")
     return url
+
+
+async def get_by_code(session: AsyncSession, short_code: str) -> Url | None:
+    url: Url | None = await session.scalar(
+        select(Url).where(Url.short_code == short_code, Url.deleted_at.is_(None))
+    )
+    return url
+
+
+async def list_page(
+    session: AsyncSession, *, owner_id: int | None, limit: int, before_id: int | None
+) -> list[Url]:
+    """Keyset pagination, newest first.
+
+    ``WHERE id < :cursor ORDER BY id DESC LIMIT n`` costs the same on page 1000 as on
+    page 1. OFFSET pagination would scan and discard every earlier row. With an owner
+    filter this is a single range scan of ix_urls_owner_id_id.
+    """
+    stmt = select(Url).where(Url.deleted_at.is_(None)).order_by(Url.id.desc()).limit(limit)
+    if owner_id is not None:
+        stmt = stmt.where(Url.owner_id == owner_id)
+    if before_id is not None:
+        stmt = stmt.where(Url.id < before_id)
+    return list(await session.scalars(stmt))

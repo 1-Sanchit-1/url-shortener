@@ -1,7 +1,10 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEV_JWT_SECRET = "dev-only-insecure-jwt-secret-change-me"  # noqa: S105
 
 
 class Settings(BaseSettings):
@@ -23,6 +26,19 @@ class Settings(BaseSettings):
     # Short codes
     short_code_length: int = 7
     short_code_max_attempts: int = 5
+
+    # Authentication
+    jwt_secret: SecretStr = SecretStr(DEV_JWT_SECRET)
+    jwt_algorithm: str = "HS256"
+    jwt_issuer: str = "url-shortener"
+    access_token_ttl_seconds: int = 15 * 60
+
+    @model_validator(mode="after")
+    def _require_real_secret_in_prod(self) -> "Settings":
+        secret = self.jwt_secret.get_secret_value()
+        if self.environment == "prod" and (secret == DEV_JWT_SECRET or len(secret) < 32):
+            raise ValueError("APP_JWT_SECRET must be set to a random value of 32+ characters")
+        return self
 
 
 @lru_cache
