@@ -1,15 +1,25 @@
 services:
   api:
     build: .
-    environment:
+    environment: &app-env
       APP_ENVIRONMENT: dev
+      APP_DATABASE_URL: postgresql+asyncpg://shortener:shortener@postgres:5432/shortener
       WEB_CONCURRENCY: "2"
     ports:
       - "8000:8000"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
+        condition: service_healthy
+
+  # One-shot job: apply migrations before the API starts accepting traffic.
+  migrate:
+    build: .
+    environment: *app-env
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
         condition: service_healthy
 
   postgres:
@@ -28,6 +38,7 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init-test-db.sql:/docker-entrypoint-initdb.d/init-test-db.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U shortener -d shortener"]
       interval: 5s

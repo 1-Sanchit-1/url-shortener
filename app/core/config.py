@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     base_url: str = "http://localhost:8000"
     log_level: str = "INFO"
 
+    # PostgreSQL
+    database_url: str = "postgresql+asyncpg://shortener:shortener@localhost:5432/shortener"
+    db_pool_size: int = 5
+    db_max_overflow: int = 10
+    db_pool_timeout_seconds: float = 5.0
+
 
 @lru_cache
 def get_settings() -> Settings:

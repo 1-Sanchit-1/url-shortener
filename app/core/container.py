@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
+
 from app.core.config import Settings
+from app.db.session import create_engine, create_sessionmaker
 
 
 @dataclass(slots=True)
@@ -12,10 +15,13 @@ class Container:
     """
 
     settings: Settings
+    engine: AsyncEngine
+    sessionmaker: async_sessionmaker[AsyncSession]
 
     @classmethod
     async def create(cls, settings: Settings) -> "Container":
-        return cls(settings=settings)
+        engine = create_engine(settings)
+        return cls(settings=settings, engine=engine, sessionmaker=create_sessionmaker(engine))
 
     async def aclose(self) -> None:
-        return None
+        await self.engine.dispose()

@@ -19,6 +19,8 @@ ENV PATH=/opt/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1
 COPY --from=builder /opt/venv /opt/venv
 WORKDIR /app
+COPY alembic.ini ./
+COPY migrations ./migrations
 COPY app ./app
 USER app
 EXPOSE 8000

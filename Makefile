@@ -1,4 +1,4 @@
-.PHONY: help install up down logs lint format typecheck test check
+.PHONY: help install up down logs db migrate lint format typecheck test check
 
 help:  ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
@@ -14,6 +14,12 @@ down:  ## Stop the stack
 
 logs:  ## Tail API logs
 	docker compose logs -f api
+
+db:  ## Start only PostgreSQL and Redis (for local development and tests)
+	docker compose up -d postgres redis
+
+migrate:  ## Apply database migrations
+	uv run alembic upgrade head
 
 lint:  ## Lint and check formatting
 	uv run ruff check .

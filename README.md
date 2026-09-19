@@ -7,8 +7,10 @@ redirects, click analytics, and operating the service in production.
 
 ```bash
 uv sync
+make db          # PostgreSQL + Redis in Docker
+make migrate
 uv run uvicorn --factory app.main:create_app --reload
-uv run pytest
+make test        # tests run against the shortener_test database
 ```
 
 ## Running with Docker
