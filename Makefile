@@ -6,7 +6,7 @@ help:  ## Show available targets
 install:  ## Install dependencies into .venv
 	uv sync
 
-up:  ## Start the full stack in Docker
+up:  ## Start the full stack (nginx -> 2 API replicas, worker, postgres, redis)
 	docker compose up --build -d
 
 down:  ## Stop the stack
