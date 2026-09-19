@@ -16,6 +16,7 @@ services:
       APP_DATABASE_URL: postgresql+asyncpg://shortener:shortener@postgres:5432/shortener
       APP_REDIS_URL: redis://redis:6379/0
       APP_LOG_FORMAT: json
+      APP_ACCESS_LOG_SAMPLE_RATE: "${ACCESS_LOG_SAMPLE_RATE:-0.1}"
       # One process per container; scale by adding replicas (see metrics.py).
       WEB_CONCURRENCY: "1"
       # Trust X-Forwarded-For from nginx so rate limits see the real client IP.

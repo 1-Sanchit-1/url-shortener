@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, Request, status
 from fastapi.responses import RedirectResponse
-from starlette.background import BackgroundTask
 
 from app.api.deps import ContainerDep, ResolverDep
 from app.api.ratelimit import limit_by_ip
@@ -34,10 +33,5 @@ async def follow(
         raise GoneError("short link has expired")
 
     publisher = container.click_publisher
-    event = publisher.build_event(link.url_id, request)
-    # Runs after the response is sent, so it adds nothing to redirect latency.
-    return RedirectResponse(
-        link.target_url,
-        status_code=status.HTTP_302_FOUND,
-        background=BackgroundTask(publisher.publish, event),
-    )
+    publisher.enqueue(publisher.build_event(link.url_id, request))
+    return RedirectResponse(link.target_url, status_code=status.HTTP_302_FOUND)

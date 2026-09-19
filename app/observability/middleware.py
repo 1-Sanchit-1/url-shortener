@@ -1,4 +1,5 @@
 import logging
+import random
 import re
 import time
 import uuid
@@ -22,8 +23,10 @@ class ObservabilityMiddleware:
     tail latency on a sub-millisecond redirect path.
     """
 
-    def __init__(self, app: ASGIApp) -> None:
+    def __init__(self, app: ASGIApp, sample_rate: float = 1.0, slow_ms: float = 250.0) -> None:
         self.app = app
+        self.sample_rate = sample_rate
+        self.slow_ms = slow_ms
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -56,7 +59,7 @@ class ObservabilityMiddleware:
             method = scope["method"]
             HTTP_REQUESTS.labels(method, route, str(status_code)).inc()
             HTTP_LATENCY.labels(method, route).observe(elapsed)
-            if route not in _QUIET_ROUTES:
+            if route not in _QUIET_ROUTES and self._should_log(status_code, elapsed):
                 logger.info(
                     "request",
                     extra={
@@ -67,6 +70,15 @@ class ObservabilityMiddleware:
                         "duration_ms": round(elapsed * 1000, 2),
                     },
                 )
+
+    def _should_log(self, status_code: int, elapsed: float) -> bool:
+        # Formatting and writing a JSON line costs ~50us, roughly 15% of a cached
+        # redirect. At thousands of redirects per second, sampling the boring ones
+        # keeps the logs useful for errors and outliers without paying that on
+        # every request.
+        if status_code >= 400 or elapsed * 1000 >= self.slow_ms:
+            return True
+        return self.sample_rate >= 1.0 or random.random() < self.sample_rate  # noqa: S311
 
 
 def _incoming_request_id(scope: Scope) -> str | None:

@@ -118,6 +118,7 @@ async def test_end_to_end_click_is_counted(
 ) -> None:
     await _link(client, user_headers, alias="e2e")
     await client.get("/e2e", headers={"Referer": "https://social.example/feed"})
+    await container.click_publisher.flush()
 
     consumer = ClickConsumer(
         container.redis, container.sessionmaker, container.settings, consumer_name="t"

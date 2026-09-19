@@ -45,6 +45,7 @@ async def test_redirect_publishes_click_event(
         "/tracked",
         headers={"Referer": "https://news.example.org/post/1", "User-Agent": "pytest-agent"},
     )
+    await container.click_publisher.flush()
 
     entries: Any = await container.redis.xrange(settings.click_stream_name)
     assert len(entries) == 1
@@ -66,6 +67,7 @@ async def test_consumer_persists_and_acknowledges(
     await _make_link(client, user_headers)
     for _ in range(3):
         await client.get("/tracked")
+    await container.click_publisher.flush()
 
     assert await consumer.run_once() == 3
     assert await _count(session) == 3
@@ -85,6 +87,7 @@ async def test_redelivered_entries_are_not_double_counted(
     await _make_link(client, user_headers)
     await client.get("/tracked")
     await client.get("/tracked")
+    await container.click_publisher.flush()
 
     # Consumer A reads the entries, persists them, then "crashes" before XACK.
     crashed = ClickConsumer(container.redis, container.sessionmaker, settings, "crashed")

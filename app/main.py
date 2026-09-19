@@ -26,7 +26,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await container.aclose()
 
     app = FastAPI(title="URL Shortener", version="0.1.0", lifespan=lifespan)
-    app.add_middleware(ObservabilityMiddleware)
+    app.add_middleware(
+        ObservabilityMiddleware,
+        sample_rate=settings.access_log_sample_rate,
+        slow_ms=settings.access_log_slow_ms,
+    )
     register_error_handlers(app)
     app.include_router(health.router)
     app.include_router(metrics.router)

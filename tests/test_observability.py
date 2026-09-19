@@ -6,6 +6,7 @@ import structlog
 from httpx import AsyncClient
 
 from app.core.logging import configure_logging
+from app.observability.middleware import ObservabilityMiddleware
 
 
 async def test_request_id_is_generated(client: AsyncClient) -> None:
@@ -61,3 +62,11 @@ def test_logs_render_as_json_with_request_context(capsys: pytest.CaptureFixture[
     assert line["tier"] == "l2"
     assert line["logger"] == "app.test"
     assert "timestamp" in line
+
+
+def test_sampling_keeps_errors_and_slow_requests() -> None:
+    middleware = ObservabilityMiddleware(app=None, sample_rate=0.0, slow_ms=250)  # type: ignore[arg-type]
+    assert not middleware._should_log(302, 0.002)
+    assert middleware._should_log(404, 0.002)
+    assert middleware._should_log(500, 0.002)
+    assert middleware._should_log(302, 0.300)

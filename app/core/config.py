@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     base_url: str = "http://localhost:8000"
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "json"
+    # Fraction of fast, successful requests that get an access log line. Errors
+    # (>= 400) and slow requests are always logged; metrics count every request.
+    access_log_sample_rate: float = 1.0
+    access_log_slow_ms: float = 250.0
 
     # PostgreSQL
     database_url: str = "postgresql+asyncpg://shortener:shortener@localhost:5432/shortener"
@@ -55,6 +59,10 @@ class Settings(BaseSettings):
     click_batch_size: int = 500
     click_block_ms: int = 1000
     click_claim_idle_ms: int = 30_000
+    # API-side batching of click events (see ClickPublisher).
+    click_flush_interval_ms: int = 50
+    click_flush_max_batch: int = 500
+    click_buffer_capacity: int = 50_000
     worker_metrics_port: int = 9100
     analytics_salt: SecretStr = SecretStr("dev-only-analytics-salt")
 

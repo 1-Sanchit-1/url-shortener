@@ -57,6 +57,8 @@ class Container:
         bus.start()
         pool = engine.sync_engine.pool
         DB_POOL_CHECKED_OUT.set_function(lambda: float(getattr(pool, "checkedout", lambda: 0)()))
+        click_publisher = ClickPublisher(redis, settings)
+        click_publisher.start()
         return cls(
             settings=settings,
             engine=engine,
@@ -66,10 +68,11 @@ class Container:
             resolver=resolver,
             invalidation_bus=bus,
             rate_limiter=TokenBucketLimiter(redis),
-            click_publisher=ClickPublisher(redis, settings),
+            click_publisher=click_publisher,
         )
 
     async def aclose(self) -> None:
+        await self.click_publisher.stop()  # flushes buffered clicks before Redis closes
         await self.invalidation_bus.stop()
         await self.pubsub_redis.aclose()
         await self.redis.aclose()
