@@ -1,5 +1,7 @@
 # Distributed URL Shortener
 
+![CI](https://github.com/1-Sanchit-1/url-shortener/actions/workflows/ci.yml/badge.svg)
+
 A URL shortener built with FastAPI, PostgreSQL and Redis. It focuses on low-latency
 redirects, click analytics, and operating the service in production.
 
