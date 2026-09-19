@@ -57,6 +57,7 @@ jobs:
           --health-interval 5s --health-timeout 3s --health-retries 10
     env:
       APP_DATABASE_URL: postgresql+asyncpg://shortener:shortener@localhost:5432/shortener_test
+      APP_REDIS_URL: redis://localhost:6379/15
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

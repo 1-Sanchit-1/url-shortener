@@ -23,6 +23,11 @@ async def readiness(container: ContainerDep) -> JSONResponse:
         checks["postgres"] = "ok"
     except Exception as exc:
         checks["postgres"] = f"error: {type(exc).__name__}"
+    try:
+        await container.redis.ping()
+        checks["redis"] = "ok"
+    except Exception as exc:
+        checks["redis"] = f"error: {type(exc).__name__}"
 
     healthy = all(v == "ok" for v in checks.values())
     return JSONResponse(

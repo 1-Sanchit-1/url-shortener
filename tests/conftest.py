@@ -22,6 +22,7 @@ TEST_DATABASE_URL = os.environ.get(
     "APP_DATABASE_URL",
     "postgresql+asyncpg://shortener:shortener@localhost:5432/shortener_test",
 )
+TEST_REDIS_URL = os.environ.get("APP_REDIS_URL", "redis://localhost:6379/15")
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -47,7 +48,7 @@ async def _drop_schema() -> None:
 
 @pytest.fixture
 def settings() -> Settings:
-    return Settings(environment="test", database_url=TEST_DATABASE_URL)
+    return Settings(environment="test", database_url=TEST_DATABASE_URL, redis_url=TEST_REDIS_URL)
 
 
 @pytest.fixture
@@ -62,6 +63,7 @@ async def _reset_state(container: Container) -> None:
     tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
     async with container.engine.begin() as conn:
         await conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+    await container.redis.flushdb()
 
 
 @pytest.fixture

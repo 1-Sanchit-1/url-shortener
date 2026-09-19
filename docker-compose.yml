@@ -4,6 +4,7 @@ services:
     environment: &app-env
       APP_ENVIRONMENT: dev
       APP_DATABASE_URL: postgresql+asyncpg://shortener:shortener@postgres:5432/shortener
+      APP_REDIS_URL: redis://redis:6379/0
       WEB_CONCURRENCY: "2"
     ports:
       - "8000:8000"

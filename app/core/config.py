@@ -23,6 +23,18 @@ class Settings(BaseSettings):
     db_max_overflow: int = 10
     db_pool_timeout_seconds: float = 5.0
 
+    # Redis
+    redis_url: str = "redis://localhost:6379/0"
+    redis_max_connections: int = 100
+    # Short timeouts: on the redirect path a slow Redis is worse than a missing one,
+    # because we can always fall back to PostgreSQL.
+    redis_socket_timeout_seconds: float = 0.25
+
+    # Link cache
+    cache_ttl_seconds: int = 3600
+    cache_ttl_jitter: float = 0.1
+    cache_negative_ttl_seconds: int = 30
+
     # Short codes
     short_code_length: int = 7
     short_code_max_attempts: int = 5

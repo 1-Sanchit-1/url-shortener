@@ -11,6 +11,7 @@ from app.core.errors import ForbiddenError, UnauthorizedError
 from app.core.security import Principal, decode_access_token
 from app.models import Role
 from app.services.auth import AuthService
+from app.services.links import LinkResolver
 from app.services.urls import UrlService
 
 
@@ -68,8 +69,8 @@ def require_role(*roles: Role) -> Callable[[Principal], Coroutine[Any, Any, Prin
 AdminDep = Annotated[Principal, Depends(require_role(Role.ADMIN))]
 
 
-def get_url_service(session: SessionDep, settings: SettingsDep) -> UrlService:
-    return UrlService(session, settings)
+def get_url_service(session: SessionDep, container: ContainerDep) -> UrlService:
+    return UrlService(session, container.settings, container.link_cache)
 
 
 UrlServiceDep = Annotated[UrlService, Depends(get_url_service)]
@@ -80,3 +81,10 @@ def get_auth_service(session: SessionDep, settings: SettingsDep) -> AuthService:
 
 
 AuthServiceDep = Annotated[AuthService, Depends(get_auth_service)]
+
+
+def get_resolver(container: ContainerDep) -> LinkResolver:
+    return container.resolver
+
+
+ResolverDep = Annotated[LinkResolver, Depends(get_resolver)]
