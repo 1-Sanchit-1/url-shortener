@@ -8,7 +8,7 @@ import pytest
 from asgi_lifespan import LifespanManager
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy import text
+from sqlalchemy import make_url, text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app import models  # noqa: F401  (registers every table on Base.metadata)
@@ -23,6 +23,14 @@ TEST_DATABASE_URL = os.environ.get(
     "postgresql+asyncpg://shortener:shortener@localhost:5432/shortener_test",
 )
 TEST_REDIS_URL = os.environ.get("APP_REDIS_URL", "redis://localhost:6379/15")
+
+# The suite drops the schema and flushes Redis. Refuse to point it at anything that
+# isn't clearly a test database. (This guard exists because an exported dev
+# APP_DATABASE_URL once wiped a seeded benchmark dataset.)
+if not (make_url(TEST_DATABASE_URL).database or "").endswith("_test"):
+    pytest.exit(f"refusing to run tests against non-test database: {TEST_DATABASE_URL}", 2)
+if not TEST_REDIS_URL.rstrip("/").endswith("/15"):
+    pytest.exit(f"tests must use Redis database 15, got: {TEST_REDIS_URL}", 2)
 
 
 @pytest.fixture(scope="session", autouse=True)
