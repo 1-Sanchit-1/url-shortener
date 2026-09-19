@@ -3,7 +3,6 @@ from urllib.parse import urlsplit
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.cache.redis_cache import LinkCache
 from app.core.config import Settings
 from app.core.errors import InvalidRequestError, NotFoundError
 from app.core.security import Principal
@@ -11,14 +10,15 @@ from app.models import Url
 from app.models.url import MAX_TARGET_URL_LENGTH
 from app.repositories import urls as url_repo
 from app.schemas.urls import ShortenRequest, UpdateUrlRequest, UrlPage, UrlResponse
+from app.services.links import LinkResolver
 from app.services.shortcode import validate_alias
 
 
 class UrlService:
-    def __init__(self, session: AsyncSession, settings: Settings, cache: LinkCache) -> None:
+    def __init__(self, session: AsyncSession, settings: Settings, resolver: LinkResolver) -> None:
         self._session = session
         self._settings = settings
-        self._cache = cache
+        self._resolver = resolver
 
     async def shorten(self, request: ShortenRequest, owner_id: int) -> Url:
         target = str(request.target_url)
@@ -44,7 +44,7 @@ class UrlService:
             )
         await self._session.commit()
         # The code may have been looked up before it existed; drop that negative entry.
-        await self._cache.invalidate(url.short_code)
+        await self._resolver.invalidate(url.short_code)
         return url
 
     async def get_for(self, short_code: str, principal: Principal) -> Url:
@@ -67,7 +67,7 @@ class UrlService:
             self._validate_expiry(body.expires_at)
             url.expires_at = body.expires_at
         await self._session.commit()
-        await self._cache.invalidate(short_code)
+        await self._resolver.invalidate(short_code)
         return url
 
     async def delete(self, short_code: str, principal: Principal) -> Url:
@@ -75,7 +75,7 @@ class UrlService:
         url.deleted_at = datetime.now(UTC)
         url.is_active = False
         await self._session.commit()
-        await self._cache.invalidate(short_code)
+        await self._resolver.invalidate(short_code)
         return url
 
     async def list_page(

@@ -70,7 +70,7 @@ AdminDep = Annotated[Principal, Depends(require_role(Role.ADMIN))]
 
 
 def get_url_service(session: SessionDep, container: ContainerDep) -> UrlService:
-    return UrlService(session, container.settings, container.link_cache)
+    return UrlService(session, container.settings, container.resolver)
 
 
 UrlServiceDep = Annotated[UrlService, Depends(get_url_service)]

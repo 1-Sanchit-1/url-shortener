@@ -3,7 +3,9 @@ from dataclasses import dataclass
 from redis.asyncio import BlockingConnectionPool, Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
-from app.cache.redis_cache import LinkCache
+from app.cache.invalidation import InvalidationBus
+from app.cache.local import LocalCache
+from app.cache.redis_cache import CacheEntry, LinkCache
 from app.core.config import Settings
 from app.db.session import create_engine, create_sessionmaker
 from app.services.links import LinkResolver
@@ -21,25 +23,46 @@ class Container:
     engine: AsyncEngine
     sessionmaker: async_sessionmaker[AsyncSession]
     redis: Redis
-    link_cache: LinkCache
+    pubsub_redis: Redis
     resolver: LinkResolver
+    invalidation_bus: InvalidationBus
 
     @classmethod
     async def create(cls, settings: Settings) -> "Container":
         engine = create_engine(settings)
         sessionmaker = create_sessionmaker(engine)
         redis = create_redis(settings)
-        link_cache = LinkCache(redis, settings)
+        # Pub/sub holds a connection open and blocks on reads, so it gets its own
+        # client without the short socket timeout used for cache lookups.
+        pubsub_redis = Redis.from_url(settings.redis_url, socket_connect_timeout=1.0)
+
+        resolver = LinkResolver(
+            local=LocalCache[CacheEntry](
+                max_entries=settings.l1_cache_max_entries,
+                ttl_seconds=settings.l1_cache_ttl_seconds,
+                stale_grace_seconds=settings.l1_stale_grace_seconds,
+            ),
+            shared=LinkCache(redis, settings),
+            sessionmaker=sessionmaker,
+        )
+        bus = InvalidationBus(
+            pubsub_redis, on_invalidate=resolver.evict_local, on_reset=resolver.clear_local
+        )
+        resolver.attach_bus(bus)
+        bus.start()
         return cls(
             settings=settings,
             engine=engine,
             sessionmaker=sessionmaker,
             redis=redis,
-            link_cache=link_cache,
-            resolver=LinkResolver(link_cache, sessionmaker),
+            pubsub_redis=pubsub_redis,
+            resolver=resolver,
+            invalidation_bus=bus,
         )
 
     async def aclose(self) -> None:
+        await self.invalidation_bus.stop()
+        await self.pubsub_redis.aclose()
         await self.redis.aclose()
         await self.engine.dispose()
 

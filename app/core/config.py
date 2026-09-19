@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     cache_ttl_seconds: int = 3600
     cache_ttl_jitter: float = 0.1
     cache_negative_ttl_seconds: int = 30
+    # In-process L1 tier. The TTL bounds cross-process staleness if a pub/sub
+    # invalidation is missed; the grace period is how long an expired entry may be
+    # served while Redis and PostgreSQL are both unavailable.
+    l1_cache_max_entries: int = 10_000
+    l1_cache_ttl_seconds: float = 5.0
+    l1_stale_grace_seconds: float = 300.0
 
     # Short codes
     short_code_length: int = 7
