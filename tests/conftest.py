@@ -9,7 +9,7 @@ from asgi_lifespan import LifespanManager
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app import models  # noqa: F401  (registers every table on Base.metadata)
 from app.core.config import Settings
@@ -66,6 +66,12 @@ async def _reset_state(container: Container) -> None:
 @pytest.fixture
 def container(app: FastAPI) -> Container:
     return app.state.container  # type: ignore[no-any-return]
+
+
+@pytest.fixture
+async def session(container: Container) -> AsyncIterator[AsyncSession]:
+    async with container.sessionmaker() as db_session:
+        yield db_session
 
 
 @pytest.fixture

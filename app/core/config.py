@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     db_max_overflow: int = 10
     db_pool_timeout_seconds: float = 5.0
 
+    # Short codes
+    short_code_length: int = 7
+    short_code_max_attempts: int = 5
+
 
 @lru_cache
 def get_settings() -> Settings:
