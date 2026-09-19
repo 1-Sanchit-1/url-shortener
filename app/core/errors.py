@@ -48,6 +48,15 @@ class GoneError(AppError):
     code = "gone"
 
 
+class RateLimitedError(AppError):
+    status_code = 429
+    code = "rate_limited"
+
+    def __init__(self, message: str, headers: dict[str, str]) -> None:
+        super().__init__(message)
+        self.headers = headers
+
+
 class ServiceUnavailableError(AppError):
     status_code = 503
     code = "service_unavailable"

@@ -8,6 +8,7 @@ from app.cache.local import LocalCache
 from app.cache.redis_cache import CacheEntry, LinkCache
 from app.core.config import Settings
 from app.db.session import create_engine, create_sessionmaker
+from app.ratelimit.token_bucket import TokenBucketLimiter
 from app.services.links import LinkResolver
 
 
@@ -26,6 +27,7 @@ class Container:
     pubsub_redis: Redis
     resolver: LinkResolver
     invalidation_bus: InvalidationBus
+    rate_limiter: TokenBucketLimiter
 
     @classmethod
     async def create(cls, settings: Settings) -> "Container":
@@ -58,6 +60,7 @@ class Container:
             pubsub_redis=pubsub_redis,
             resolver=resolver,
             invalidation_bus=bus,
+            rate_limiter=TokenBucketLimiter(redis),
         )
 
     async def aclose(self) -> None:

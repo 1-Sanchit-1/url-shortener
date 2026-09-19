@@ -1,13 +1,16 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
 from app.api.deps import AdminDep, AuthServiceDep, UrlServiceDep
+from app.api.ratelimit import limit_by_user
 from app.models import Role
 from app.schemas.auth import RoleUpdateRequest, UserResponse
 from app.schemas.urls import UrlPage
 
-router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
+router = APIRouter(
+    prefix="/api/v1/admin", tags=["admin"], dependencies=[Depends(limit_by_user("read"))]
+)
 
 
 @router.get("/urls")

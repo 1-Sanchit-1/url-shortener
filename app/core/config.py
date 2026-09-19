@@ -4,13 +4,17 @@ from typing import Literal
 from pydantic import SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.ratelimit.policy import RateLimitPolicy
+
 DEV_JWT_SECRET = "dev-only-insecure-jwt-secret-change-me"  # noqa: S105
 
 
 class Settings(BaseSettings):
     """Application settings, loaded from environment variables prefixed with ``APP_``."""
 
-    model_config = SettingsConfigDict(env_prefix="APP_", env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="APP_", env_file=".env", env_nested_delimiter="__", extra="ignore"
+    )
 
     environment: Literal["dev", "test", "prod"] = "dev"
     app_name: str = "url-shortener"
@@ -51,6 +55,20 @@ class Settings(BaseSettings):
     jwt_issuer: str = "url-shortener"
     access_token_ttl_seconds: int = 15 * 60
     refresh_token_ttl_seconds: int = 14 * 24 * 60 * 60
+
+    # Rate limiting (token buckets). Override per field, e.g.
+    # APP_RATE_LIMIT_AUTH__CAPACITY=20
+    rate_limit_enabled: bool = True
+    # Anonymous redirects, per client IP. Generous: this only stops scrapers and floods.
+    rate_limit_redirect: RateLimitPolicy = RateLimitPolicy(capacity=200, refill_per_second=100)
+    # Register/login/refresh, per client IP: 10 attempts, then one every 6 seconds.
+    rate_limit_auth: RateLimitPolicy = RateLimitPolicy(capacity=10, refill_per_second=1 / 6)
+    # Mutations, per user: a burst of 30, then 1 every 2 seconds.
+    rate_limit_write: RateLimitPolicy = RateLimitPolicy(capacity=30, refill_per_second=0.5)
+    # Authenticated reads, per user.
+    rate_limit_read: RateLimitPolicy = RateLimitPolicy(capacity=120, refill_per_second=2)
+    # Admins get proportionally larger buckets.
+    rate_limit_admin_multiplier: float = 10.0
 
     @model_validator(mode="after")
     def _require_real_secret_in_prod(self) -> "Settings":

@@ -1,7 +1,8 @@
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Depends, status
 from fastapi.responses import RedirectResponse
 
 from app.api.deps import ResolverDep
+from app.api.ratelimit import limit_by_ip
 from app.core.errors import GoneError, NotFoundError
 
 router = APIRouter(tags=["redirect"])
@@ -9,7 +10,11 @@ router = APIRouter(tags=["redirect"])
 MAX_CODE_LENGTH = 32
 
 
-@router.get("/{short_code}", response_class=RedirectResponse)
+@router.get(
+    "/{short_code}",
+    response_class=RedirectResponse,
+    dependencies=[Depends(limit_by_ip("redirect"))],
+)
 async def follow(short_code: str, resolver: ResolverDep) -> RedirectResponse:
     """Redirect to the target URL.
 
