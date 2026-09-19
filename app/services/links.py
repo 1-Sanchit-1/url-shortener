@@ -8,6 +8,7 @@ from app.cache.local import LocalCache
 from app.cache.redis_cache import CacheEntry, LinkCache
 from app.cache.singleflight import SingleFlight
 from app.domain import Link
+from app.observability.metrics import CACHE_LOOKUPS, DB_LOOKUPS, STALE_SERVED
 from app.repositories import urls as url_repo
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,9 @@ class LinkResolver:
     async def resolve(self, short_code: str) -> Link | None:
         entry = self._local.get(short_code)
         if entry is not None:
+            CACHE_LOOKUPS.labels("l1", "hit" if entry.link else "negative_hit").inc()
             return entry.link
+        CACHE_LOOKUPS.labels("l1", "miss").inc()
         return await self._flight.do(short_code, lambda: self._resolve_miss(short_code))
 
     async def invalidate(self, short_code: str) -> None:
@@ -69,6 +72,7 @@ class LinkResolver:
                 stale = self._local.get_stale(short_code)
                 if stale is None:
                     raise
+                STALE_SERVED.inc()
                 logger.warning(
                     "database unavailable; serving stale link", extra={"code": short_code}
                 )
@@ -79,6 +83,7 @@ class LinkResolver:
         return entry.link
 
     async def _load(self, short_code: str) -> Link | None:
+        DB_LOOKUPS.inc()
         async with self._sessionmaker() as session:
             url = await url_repo.get_by_code(session, short_code)
         if url is None:

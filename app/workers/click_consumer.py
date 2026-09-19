@@ -19,6 +19,7 @@ import time
 from datetime import UTC, datetime
 from typing import Any
 
+from prometheus_client import start_http_server
 from redis.asyncio import Redis
 from redis.exceptions import ResponseError
 from sqlalchemy.dialects.postgresql import insert
@@ -26,8 +27,14 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.cache.redis_cache import REDIS_ERRORS
 from app.core.config import Settings, get_settings
+from app.core.logging import configure_logging
 from app.db.session import create_engine, create_sessionmaker
 from app.models import ClickEvent
+from app.observability.metrics import (
+    CLICK_BATCH_DURATION,
+    CLICK_EVENTS_INGESTED,
+    CLICK_STREAM_LAG,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -86,9 +93,18 @@ class ClickConsumer:
                 rows.append(row)
 
         if rows:
-            await self._persist(rows)
+            with CLICK_BATCH_DURATION.time():
+                await self._persist(rows)
+            CLICK_EVENTS_INGESTED.inc(len(rows))
         await self._redis.xack(self._stream, self._group, *ids)
         return len(ids)
+
+    async def update_lag(self) -> None:
+        """Entries not yet delivered to this group (Redis 7+). Alert when it keeps growing."""
+        groups: Any = await self._redis.xinfo_groups(self._stream)
+        for group in groups:
+            if group.get("name") in (self._group, self._group.encode()):
+                CLICK_STREAM_LAG.set(group.get("lag") or 0)
 
     async def run(self, stop: asyncio.Event) -> None:
         await self.ensure_group()
@@ -96,6 +112,7 @@ class ClickConsumer:
         while not stop.is_set():
             try:
                 await self.run_once()
+                await self.update_lag()
             except REDIS_ERRORS as exc:
                 logger.warning("stream read failed; backing off", extra={"error": repr(exc)})
                 await asyncio.sleep(1)
@@ -145,7 +162,8 @@ def parse_entry(entry_id: bytes | str, fields: dict[bytes, bytes]) -> Row | None
 
 async def main() -> None:
     settings = get_settings()
-    logging.basicConfig(level=settings.log_level)
+    configure_logging(settings.log_level, settings.log_format)
+    start_http_server(settings.worker_metrics_port)
     engine = create_engine(settings)
     redis = Redis.from_url(settings.redis_url)
     consumer = ClickConsumer(

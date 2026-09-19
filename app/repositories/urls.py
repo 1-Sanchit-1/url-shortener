@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ConflictError, ServiceUnavailableError
 from app.models import Url
+from app.observability.metrics import SHORT_CODE_COLLISIONS
 from app.services.shortcode import CodeGenerator, random_code
 
 logger = logging.getLogger(__name__)
@@ -77,6 +78,7 @@ async def insert_with_generated_code(
         )
         if url is not None:
             return url
+        SHORT_CODE_COLLISIONS.inc()
         logger.warning("short code collision", extra={"attempt": attempt + 1})
     raise ShortCodeExhaustedError(f"no free short code after {max_attempts} attempts")
 

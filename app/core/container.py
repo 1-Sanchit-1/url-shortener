@@ -9,6 +9,7 @@ from app.cache.local import LocalCache
 from app.cache.redis_cache import CacheEntry, LinkCache
 from app.core.config import Settings
 from app.db.session import create_engine, create_sessionmaker
+from app.observability.metrics import DB_POOL_CHECKED_OUT
 from app.ratelimit.token_bucket import TokenBucketLimiter
 from app.services.links import LinkResolver
 
@@ -54,6 +55,8 @@ class Container:
         )
         resolver.attach_bus(bus)
         bus.start()
+        pool = engine.sync_engine.pool
+        DB_POOL_CHECKED_OUT.set_function(lambda: float(getattr(pool, "checkedout", lambda: 0)()))
         return cls(
             settings=settings,
             engine=engine,

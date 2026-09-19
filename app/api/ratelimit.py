@@ -6,6 +6,7 @@ from fastapi import Request, Response
 from app.api.deps import ContainerDep, PrincipalDep
 from app.core.container import Container
 from app.core.errors import RateLimitedError
+from app.observability.metrics import RATE_LIMIT_DECISIONS
 from app.ratelimit.policy import RateLimitPolicy
 
 PolicyName = Literal["redirect", "auth", "write", "read"]
@@ -24,6 +25,7 @@ async def _enforce(
     response: Response,
 ) -> None:
     decision = await container.rate_limiter.acquire(f"{name}:{identity}", policy)
+    RATE_LIMIT_DECISIONS.labels(name, "allowed" if decision.allowed else "limited").inc()
     headers = {
         "X-RateLimit-Limit": str(decision.limit),
         "X-RateLimit-Remaining": str(decision.remaining),

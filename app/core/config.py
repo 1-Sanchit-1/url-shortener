@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     app_name: str = "url-shortener"
     base_url: str = "http://localhost:8000"
     log_level: str = "INFO"
+    log_format: Literal["json", "console"] = "json"
 
     # PostgreSQL
     database_url: str = "postgresql+asyncpg://shortener:shortener@localhost:5432/shortener"
@@ -54,6 +55,7 @@ class Settings(BaseSettings):
     click_batch_size: int = 500
     click_block_ms: int = 1000
     click_claim_idle_ms: int = 30_000
+    worker_metrics_port: int = 9100
     analytics_salt: SecretStr = SecretStr("dev-only-analytics-salt")
 
     # Short codes

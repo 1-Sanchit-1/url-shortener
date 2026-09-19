@@ -9,6 +9,7 @@ from starlette.requests import Request
 
 from app.cache.redis_cache import REDIS_ERRORS
 from app.core.config import Settings
+from app.observability.metrics import CLICK_EVENTS_PUBLISHED
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,9 @@ class ClickPublisher:
                 maxlen=self._maxlen,
                 approximate=True,
             )
+            CLICK_EVENTS_PUBLISHED.labels("ok").inc()
         except REDIS_ERRORS as exc:
+            CLICK_EVENTS_PUBLISHED.labels("dropped").inc()
             logger.warning("click event dropped", extra={"error": repr(exc)})
 
     def _visitor_hash(self, client_ip: str) -> str:

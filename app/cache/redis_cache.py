@@ -9,6 +9,7 @@ from redis.exceptions import RedisError
 
 from app.core.config import Settings
 from app.domain import Link
+from app.observability.metrics import CACHE_LOOKUPS
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +52,16 @@ class LinkCache:
         try:
             raw = await self._redis.get(KEY_PREFIX + short_code)
         except REDIS_ERRORS as exc:
+            CACHE_LOOKUPS.labels("l2", "error").inc()
             logger.warning("link cache read failed", extra={"error": repr(exc)})
             return None
         if raw is None:
+            CACHE_LOOKUPS.labels("l2", "miss").inc()
             return None
         if raw == _TOMBSTONE:
+            CACHE_LOOKUPS.labels("l2", "negative_hit").inc()
             return CacheEntry(link=None)
+        CACHE_LOOKUPS.labels("l2", "hit").inc()
         return CacheEntry(link=_decode(raw))
 
     async def set(self, short_code: str, link: Link | None) -> None:
