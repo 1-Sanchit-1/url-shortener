@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import Settings
 from app.core.container import Container
+from app.services.urls import UrlService
 
 
 def get_container(request: Request) -> Container:
@@ -28,3 +29,10 @@ async def get_session(container: ContainerDep) -> AsyncIterator[AsyncSession]:
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+
+
+def get_url_service(session: SessionDep, settings: SettingsDep) -> UrlService:
+    return UrlService(session, settings)
+
+
+UrlServiceDep = Annotated[UrlService, Depends(get_url_service)]

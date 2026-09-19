@@ -4,18 +4,21 @@ from datetime import datetime
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import ConflictError, ServiceUnavailableError
 from app.models import Url
 from app.services.shortcode import CodeGenerator, random_code
 
 logger = logging.getLogger(__name__)
 
 
-class ShortCodeExhaustedError(RuntimeError):
+class ShortCodeExhaustedError(ServiceUnavailableError):
     """No free short code was found within the configured number of attempts."""
 
+    code = "short_code_exhausted"
 
-class AliasTakenError(Exception):
-    pass
+
+class AliasTakenError(ConflictError):
+    code = "alias_taken"
 
 
 async def try_insert(
@@ -80,5 +83,5 @@ async def insert_with_alias(
         session, short_code=alias, target_url=target_url, is_custom=True, expires_at=expires_at
     )
     if url is None:
-        raise AliasTakenError(alias)
+        raise AliasTakenError(f"alias '{alias}' is already in use")
     return url

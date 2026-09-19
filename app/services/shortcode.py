@@ -13,6 +13,8 @@ import secrets
 import string
 from collections.abc import Callable
 
+from app.core.errors import InvalidRequestError
+
 BASE62_ALPHABET = string.digits + string.ascii_uppercase + string.ascii_lowercase
 _BASE = len(BASE62_ALPHABET)
 _INDEX = {char: i for i, char in enumerate(BASE62_ALPHABET)}
@@ -54,8 +56,8 @@ def random_code(length: int) -> str:
     return encode_base62(secrets.randbelow(_BASE**length)).rjust(length, BASE62_ALPHABET[0])
 
 
-class InvalidAliasError(ValueError):
-    pass
+class InvalidAliasError(InvalidRequestError):
+    code = "invalid_alias"
 
 
 def validate_alias(alias: str) -> str:
