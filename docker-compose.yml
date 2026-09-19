@@ -1,0 +1,58 @@
+services:
+  api:
+    build: .
+    environment:
+      APP_ENVIRONMENT: dev
+      WEB_CONCURRENCY: "2"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: shortener
+      POSTGRES_PASSWORD: shortener
+      POSTGRES_DB: shortener
+    # pg_stat_statements is loaded so query hot spots can be profiled under load.
+    command: >
+      postgres
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=200
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shortener -d shortener"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    # volatile-lru evicts only keys that carry a TTL (cache entries, rate-limit buckets),
+    # so the click-event stream, which has no TTL, is never evicted under memory pressure.
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy volatile-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
+  redisdata:
