@@ -1,4 +1,6 @@
 import asyncio
+import hashlib
+import secrets
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
@@ -83,3 +85,17 @@ def decode_access_token(token: str, settings: Settings) -> Principal:
         return Principal(user_id=int(claims["sub"]), role=Role(claims["role"]))
     except (jwt.PyJWTError, KeyError, ValueError) as exc:
         raise UnauthorizedError("invalid or expired token") from exc
+
+
+def new_refresh_token() -> tuple[str, str]:
+    """Return ``(token, sha256_hex)``. Only the digest is persisted.
+
+    256 bits of randomness make brute force infeasible, so a fast unsalted hash is
+    enough here (unlike passwords). A leaked table can't be used to mint sessions.
+    """
+    token = secrets.token_urlsafe(32)
+    return token, hash_refresh_token(token)
+
+
+def hash_refresh_token(token: str) -> str:
+    return hashlib.sha256(token.encode()).hexdigest()

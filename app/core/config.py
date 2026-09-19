@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_issuer: str = "url-shortener"
     access_token_ttl_seconds: int = 15 * 60
+    refresh_token_ttl_seconds: int = 14 * 24 * 60 * 60
 
     @model_validator(mode="after")
     def _require_real_secret_in_prod(self) -> "Settings":
