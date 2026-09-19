@@ -1,9 +1,11 @@
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, Response, status
 
-from app.api.deps import PrincipalDep, UrlServiceDep
+from app.api.deps import AnalyticsServiceDep, PrincipalDep, UrlServiceDep
 from app.api.ratelimit import limit_by_user
+from app.schemas.analytics import AnalyticsResponse, Granularity
 from app.schemas.urls import ShortenRequest, UpdateUrlRequest, UrlPage, UrlResponse
 
 router = APIRouter(prefix="/api/v1/urls", tags=["urls"])
@@ -46,3 +48,23 @@ async def update_url(
 async def delete_url(short_code: str, principal: PrincipalDep, service: UrlServiceDep) -> Response:
     await service.delete(short_code, principal)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/{short_code}/analytics", dependencies=_read_limit)
+async def get_analytics(
+    short_code: str,
+    principal: PrincipalDep,
+    service: UrlServiceDep,
+    analytics: AnalyticsServiceDep,
+    granularity: Granularity = Granularity.DAY,
+    start: Annotated[datetime | None, Query(description="inclusive, ISO-8601")] = None,
+    end: Annotated[datetime | None, Query(description="inclusive, ISO-8601")] = None,
+) -> AnalyticsResponse:
+    """Click time series (UTC buckets), unique visitors and top referrers.
+
+    Counts lag real time by the click pipeline's ingestion delay (normally < 2s).
+    """
+    url = await service.get_for(short_code, principal)
+    return await analytics.summarize(
+        url_id=url.id, short_code=url.short_code, granularity=granularity, start=start, end=end
+    )

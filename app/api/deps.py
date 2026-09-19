@@ -10,6 +10,7 @@ from app.core.container import Container
 from app.core.errors import ForbiddenError, UnauthorizedError
 from app.core.security import Principal, decode_access_token
 from app.models import Role
+from app.services.analytics import AnalyticsService
 from app.services.auth import AuthService
 from app.services.links import LinkResolver
 from app.services.urls import UrlService
@@ -88,3 +89,10 @@ def get_resolver(container: ContainerDep) -> LinkResolver:
 
 
 ResolverDep = Annotated[LinkResolver, Depends(get_resolver)]
+
+
+def get_analytics_service(session: SessionDep) -> AnalyticsService:
+    return AnalyticsService(session)
+
+
+AnalyticsServiceDep = Annotated[AnalyticsService, Depends(get_analytics_service)]
